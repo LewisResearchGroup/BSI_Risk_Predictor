@@ -91,7 +91,7 @@ age = st.number_input("Age (years)", min_value=0, max_value=120, key="age", help
 cci = st.number_input("Charlson Comorbidity Index (CCI)", min_value=0, max_value=20, key="cci", help=cci_info)
 pbs = st.number_input("PBS Score", min_value=0, max_value=14, key="pbs", help=pbs_info)
 sofa = st.number_input("SOFA Score", min_value=0, max_value=24, key="sofa", help=sofa_info)
-inputs_scaled = st.toggle("Scale Inputs", value=st.session_state["inputs_scaled"], key="inputs_scaled")
+# inputs_scaled = st.toggle("Scale Inputs", value=st.session_state["inputs_scaled"], key="inputs_scaled")
 
 # Predict and Reset buttons side-by-side
 col1, col2 = st.columns([1, 1])
@@ -104,12 +104,14 @@ with col2:
 # Prediction & Results
 # ------------------------
 if predict:
-    # Prepare features for prediction
+    # Prepare and scale features for prediction
     X = np.array([[age, cci, pbs, sofa]])
-    if not inputs_scaled:
-        X_scaled = scaler.transform(X)
-    else:
-        X_scaled = X
+    X_scaled = scaler.transform(X)
+
+    # if not inputs_scaled:
+    #     X_scaled = scaler.transform(X)
+    # else:
+    #     X_scaled = X
 
     # Predict mortality risk
     proba = model.predict_proba(X_scaled)[0][1]
@@ -146,8 +148,9 @@ if predict:
         "CCI": [cci],
         "PBS": [pbs],
         "SOFA": [sofa],
-        "Inputs scaled": [inputs_scaled],
-        "Model input": [X.tolist() if inputs_scaled else scaler.transform(X).tolist()],
+        # "Inputs scaled": [inputs_scaled],
+        # "Model input": [X.tolist() if inputs_scaled else scaler.transform(X).tolist()],
+        "Model input": scaler.transform(X).tolist(),
         "Predicted risk (%)": [proba * 100],
         "High risk threshold": [0.5],
         "Risk label": ["HIGH" if proba > 0.5 else "LOW"]
@@ -165,8 +168,9 @@ if predict:
     # Advanced/Debug Details
     with st.expander("Show advanced details"):
         st.write(f"Raw inputs: Age={age}, CCI={cci}, PBS={pbs}, SOFA={sofa}")
-        st.write(f"Inputs were NOT {'scaled' if not inputs_scaled else 'scaled'} before prediction.")
-        st.write(f"Model input: {X.tolist() if  not inputs_scaled else scaler.transform(X).tolist()}")
+        # st.write(f"Inputs were NOT {'scaled' if not inputs_scaled else 'scaled'} before prediction.")
+        # st.write(f"Model input: {X.tolist() if  not inputs_scaled else scaler.transform(X).tolist()}")
+        st.write(f"Model input: {scaler.transform(X).tolist()}")
         st.write(f"Output probability (risk): {proba * 100:.1f}%")
         st.write(f"Threshold for HIGH RISK: 0.5")
 
