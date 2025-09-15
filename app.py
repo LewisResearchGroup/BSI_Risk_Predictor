@@ -16,7 +16,7 @@ def load_model():
 
 @st.cache_resource
 def load_imputer():
-    """Load the fitted scaler from disk."""
+    """Load the fitted imputer from disk."""
     with open("imputer.pkl", "rb") as f:
         return pickle.load(f)
     return None
@@ -28,7 +28,7 @@ imputer = load_imputer()
 # ------------------------
 # Session state for resettable fields
 # ------------------------
-default_values = dict(age=65, cci=2, sofa=4, pbs=4, inputs_scaled=False)
+default_values = dict(age=79, cci=0, sofa=0, pbs=0)
 for k, v in default_values.items():
     if k not in st.session_state:
         st.session_state[k] = v
