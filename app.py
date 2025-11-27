@@ -131,6 +131,10 @@ cci = st.number_input("Charlson Comorbidity Index (CCI)", min_value=0, max_value
 pbs = st.number_input("PBS Score", min_value=0, max_value=14, key="pbs", help=pbs_info)
 sofa = st.number_input("SOFA Score", min_value=0, max_value=24, key="sofa", help=sofa_info)
 
+# Calibration dataset path (used for plotting age vs calibrated probabilities)
+
+calibration_df = load_calibration_data("calibration_data.csv")
+
 # --------------------------------
 # Training ranges (from your dataset)
 # --------------------------------
