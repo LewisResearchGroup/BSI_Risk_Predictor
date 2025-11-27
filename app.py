@@ -3,6 +3,30 @@ import numpy as np
 import pickle
 import pandas as pd
 
+# Baseline event rate (for contextualizing predictions)
+BASELINE_RATE = 0.15
+
+# Risk strata for human-readable grouping
+RISK_BINS = [
+    ("Low", 0.0, 0.10, "#cfd8dc"),           # light gray
+    ("Moderate", 0.10, 0.25, "#ffcc80"), # soft amber
+    ("High", 0.25, 0.40, "#ff8a65"),         # orange-red
+    ("Very high", 0.40, 1.0, "#d32f2f"),     # deep red
+]
+
+# Ticks to annotate compartment borders (fractions of 1.0)
+BOUNDARY_TICKS = [0.10, 0.25, 0.40]
+
+
+def categorize_risk(p):
+    """Return (label, color) for a probability between 0 and 1."""
+    for label, lo, hi, color in RISK_BINS:
+        if lo <= p < hi:
+            return label, color
+    # Fallback if outside [0,1]
+    return "Uncategorized", "#7391f5"
+
+
 # ------------------------
 # Model and Scaler Loaders
 # ------------------------
