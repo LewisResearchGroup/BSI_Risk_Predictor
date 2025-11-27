@@ -331,9 +331,9 @@ with st.expander("Additional Details"):
         f"""
         - **Brier score (calibrated):** 0.1086
         - **ECE (Error):** 0.0135
-        - **Calibration intercept:** -0.015  
-        - **Calibration slope:** 1.005 
-        - **Baseline event rate (30-day mortality):** 15%  
+        - **Calibration intercept:** -0.015
+        - **Calibration slope:** 1.005
+        - **Baseline event rate (30-day mortality):** 15%
         """
     )
 
