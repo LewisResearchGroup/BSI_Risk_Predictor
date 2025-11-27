@@ -257,51 +257,48 @@ if predict:
             age_mean = float(age_match["Calibrated_prob_mean"].mean())
             matched_age = age
 
-        fig, ax = plt.subplots(figsize=(5, 4))
+        fig, ax = plt.subplots(figsize=(5.2, 4.2))
         sns.pointplot(data=plot_df, x="Age", y="Calibrated_prob", color="#bbbbbb", errorbar=None, ax=ax, linewidth=0.3)
-        sns.pointplot(data=plot_df, x="Age", y="q30", color="#bbbbbb", errorbar=None, ax=ax, linewidth=0.3)
+        sns.pointplot(data=plot_df, x="Age", y="q30", color="#2ca02c", errorbar=None, ax=ax, linewidth=0.4)
 
-        ax.tick_params(axis='y', which='both', length=0)
+        ax.tick_params(axis="both", which="both", length=0)
         sns.despine(left=True, bottom=True)
 
         ax.set_xticks([0, 20, 40, 60, 80, 100])
-        ax.set_xticklabels(['0', '20', '40', '60', '80', '100'])
-        
-        ax.scatter(
-            [age],
-            [proba],
-            color=bar_color,
-            s=90,
-            zorder=4,
-            label="Current patient",
-            edgecolor="white",
-            linewidth=0.8,
-            
-        )
-        ax.scatter(
-            [matched_age],
-            [age_mean],
-            color="#bbbbbb",
-            s=70,
-            zorder=5,
-            label=f"Age {matched_age:.0f} mean",
-            edgecolor="white",
-            linewidth=0.8,
-        )
-        ax.scatter(
-            [matched_age],
-            [age_q30],
-            color="#2ca02c",
-            s=70,
-            zorder=5,
-            label=f"Age {matched_age:.0f} US baseline (q30)",
-            edgecolor="white",
-            linewidth=0.8,
-        )
+        ax.set_xticklabels(["0", "20", "40", "60", "80", "100"])
+
+        ax.scatter([age], [proba], color=bar_color, s=90, zorder=4, edgecolor="white", linewidth=0.8)
+        ax.scatter([matched_age], [age_mean], color="#bbbbbb", s=70, zorder=5, edgecolor="white", linewidth=0.8)
+        ax.scatter([matched_age], [age_q30], color="#2ca02c", s=70, zorder=5, edgecolor="white", linewidth=0.8)
         ax.set_xlabel("Age (Years)", labelpad=10)
         ax.set_ylabel("Calibrated probability", labelpad=10)
-        ax.legend()
-        ax.grid(axis="y", linestyle=":", alpha=0.4)
+
+        def annotate_point(x_val, y_val, text, color, dx=6, dy=0.05):
+            """Attach a floating label with an arrow to a point."""
+            target_y = min(max(y_val + dy, 0), 1)
+            ha = "left" if dx >= 0 else "right"
+            ax.annotate(
+                text,
+                xy=(x_val, y_val),
+                xytext=(x_val + dx, target_y),
+                textcoords="data",
+                ha=ha,
+                va="center",
+                fontsize=10,
+                bbox=dict(boxstyle="round,pad=0.35", fc="white", ec=color, lw=1),
+                arrowprops=dict(arrowstyle="-", color=color, lw=1),
+            )
+
+        if age > 40:
+            annotate_point(age, proba, f"Patient: {proba*100:.1f}%", bar_color, dx=8, dy=0.05)
+            annotate_point(matched_age, age_mean, f"Cohort: {age_mean*100:.1f}%", "#7a7a7a", dx=-10, dy=0.05)
+            annotate_point(matched_age, age_q30, f"US q30: {age_q30*100:.1f}%", "#2ca02c", dx=-4, dy=0.05)
+        else:
+            annotate_point(age, proba, f"Patient: {proba*100:.1f}%", bar_color, dx=5, dy=0)
+            annotate_point(matched_age, age_mean, f"Cohort: {age_mean*100:.1f}%", "#7a7a7a", dx=5, dy=0)
+            annotate_point(matched_age, age_q30, f"US q30: {age_q30*100:.1f}%", "#2ca02c", dx=5, dy=0)
+
+        ax.grid(axis="y", linestyle=":", alpha=0.35)
         st.pyplot(fig)
     else:
         st.info("Provide a calibration CSV path to see the calibration point plot and comparison to the dataset mean.")
