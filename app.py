@@ -244,6 +244,68 @@ if predict:
         unsafe_allow_html=True,
     )
 
+    # Calibration plot comparing dataset calibration vs current prediction
+    if calibration_df is not None and not calibration_df.empty:
+        plot_df = calibration_df.sort_values("Age")
+        age_match = plot_df[plot_df["Age"] == age]
+        if age_match.empty:
+            nearest_idx = (plot_df["Age"] - age).abs().idxmin()
+            age_mean = float(plot_df.loc[nearest_idx, "Calibrated_prob_mean"])
+            matched_age = float(plot_df.loc[nearest_idx, "Age"])
+            st.caption(f"No exact age match; using nearest age in data: {matched_age:.0f}.")
+        else:
+            age_mean = float(age_match["Calibrated_prob_mean"].mean())
+            matched_age = age
+
+        fig, ax = plt.subplots(figsize=(5, 4))
+        sns.pointplot(data=plot_df, x="Age", y="Calibrated_prob", color="#bbbbbb", errorbar=None, ax=ax, linewidth=0.3)
+        sns.pointplot(data=plot_df, x="Age", y="q30", color="#bbbbbb", errorbar=None, ax=ax, linewidth=0.3)
+
+        ax.tick_params(axis='y', which='both', length=0)
+        sns.despine(left=True, bottom=True)
+
+        ax.set_xticks([0, 20, 40, 60, 80, 100])
+        ax.set_xticklabels(['0', '20', '40', '60', '80', '100'])
+        
+        ax.scatter(
+            [age],
+            [proba],
+            color=bar_color,
+            s=90,
+            zorder=4,
+            label="Current patient",
+            edgecolor="white",
+            linewidth=0.8,
+            
+        )
+        ax.scatter(
+            [matched_age],
+            [age_mean],
+            color="#bbbbbb",
+            s=70,
+            zorder=5,
+            label=f"Age {matched_age:.0f} mean",
+            edgecolor="white",
+            linewidth=0.8,
+        )
+        ax.scatter(
+            [matched_age],
+            [age_q30],
+            color="#2ca02c",
+            s=70,
+            zorder=5,
+            label=f"Age {matched_age:.0f} US baseline (q30)",
+            edgecolor="white",
+            linewidth=0.8,
+        )
+        ax.set_xlabel("Age (Years)", labelpad=10)
+        ax.set_ylabel("Calibrated probability", labelpad=10)
+        ax.legend()
+        ax.grid(axis="y", linestyle=":", alpha=0.4)
+        st.pyplot(fig)
+    else:
+        st.info("Provide a calibration CSV path to see the calibration point plot and comparison to the dataset mean.")
+
     # Risk chip and bands under the bar
     st.markdown(
         f"""
