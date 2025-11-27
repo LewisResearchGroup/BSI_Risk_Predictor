@@ -163,17 +163,63 @@ if predict:
 
     # Predict mortality probability
     proba = model.predict_proba(X)[0][1]
+    relative = proba / BASELINE_RATE if BASELINE_RATE > 0 else float("nan")
+    risk_label, bar_color = categorize_risk(proba)
 
     # Display probability
     st.write("### Estimated Probability")
-    st.info(f"Model-estimated 30-day mortality probability: {proba * 100:.1f}%")
+    st.info(f"Model-estimated 30-day mortality probability is **{proba * 100:.1f}%**, "
+            f"which is **{relative:.1f}×** the cohort average ({BASELINE_RATE * 100:.0f}%).")
 
-    # Probability bar
+    # Segmented severity bar (four compartments with marker)
+    marker_left = min(max(proba * 100, 0), 100)
+    segments_html = "".join(
+        f"<div style='flex: {hi - lo}; background: {color}; height: 28px;'></div>"
+        for _, lo, hi, color in RISK_BINS
+    )
+    ticks_html = "".join(
+        f"""
+        <div style='position: absolute; left: {tick*100}%; top: 28px; transform: translateX(-50%); width: 1px; height: 10px; background: #666;'></div>
+        <div style='position: absolute; left: {tick*100}%; top: 40px; transform: translateX(-50%); font-size: 11px; color: #444;'>
+            {tick:.2f}
+        </div>
+        """
+        for tick in BOUNDARY_TICKS
+    )
     st.markdown(
         f"""
-        <div style='width: 100%; background: #f0f2f6; border-radius: 10px; height: 30px; margin-bottom: 10px;'>
-          <div style='width: {proba * 100:.1f}%; background: #7391f5; height: 30px; border-radius: 10px; text-align: right; color: black; padding-right: 10px; font-weight: bold;'>
-            {proba * 100:.1f}%
+        <div style='width: 100%; position: relative; margin: 8px 0 72px 0;'>
+          <div style='display: flex; border-radius: 12px; overflow: hidden; border: 1px solid #e0e0e0; height: 28px;'>
+            {segments_html}
+          </div>
+          <div style='position: absolute; left: {BASELINE_RATE*100}%; top: 32px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;'>
+            <div style='width: 2px; height: 28px; background: #1a1a1a; opacity: 0.8;'></div>
+            <div style='font-size: 10px; color: #1a1a1a; background: rgba(255,255,255,0.9); padding: 2px 6px; border-radius: 6px; border: 1px solid #d0d0d0; box-shadow: 0 1px 2px rgba(0,0,0,0.08); white-space: nowrap;'>
+              Cohort avg {BASELINE_RATE*100:.0f}%
+            </div>
+          </div>
+          <div style='position: absolute; left: {marker_left}%; top: -8px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px;'>
+            <div style='width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 8px solid #000;'></div>
+            <div style='font-size: 11px; color: #000; white-space: nowrap; background: rgba(255,255,255,0.85); padding: 0 2px; border-radius: 3px;'>{proba * 100:.1f}%</div>
+          </div>
+          {ticks_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Risk chip and bands under the bar
+    st.markdown(
+        f"""
+        <div style='margin: 10px 0 6px 0; padding: 10px 12px; border-radius: 10px; background: #eef6ff; border: 1px solid #d9e7ff;'>
+          <div style='display: inline-flex; align-items: center; gap: 8px; font-weight: 600;'>
+            <span>Risk category:</span>
+            <span style='padding: 4px 10px; border-radius: 999px; background: {bar_color}; color: #1a1a1a; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 1px 2px rgba(0,0,0,0.08);'>
+              {risk_label}
+            </span>
+          </div>
+          <div style='margin-top: 6px; font-size: 12px; color: #444;'>
+            Bands: Low &lt;0.10 · Moderate 0.10–0.25 · High 0.25–0.40 · Very high &gt;0.40
           </div>
         </div>
         """,
