@@ -3,6 +3,30 @@ import numpy as np
 import pickle
 import pandas as pd
 
+# Baseline event rate (for contextualizing predictions)
+BASELINE_RATE = 0.15
+
+# Risk strata for human-readable grouping
+RISK_BINS = [
+    ("Low", 0.0, 0.10, "#cfd8dc"),           # light gray
+    ("Moderate", 0.10, 0.25, "#ffcc80"), # soft amber
+    ("High", 0.25, 0.40, "#ff8a65"),         # orange-red
+    ("Very high", 0.40, 1.0, "#d32f2f"),     # deep red
+]
+
+# Ticks to annotate compartment borders (fractions of 1.0)
+BOUNDARY_TICKS = [0.10, 0.25, 0.40]
+
+
+def categorize_risk(p):
+    """Return (label, color) for a probability between 0 and 1."""
+    for label, lo, hi, color in RISK_BINS:
+        if lo <= p < hi:
+            return label, color
+    # Fallback if outside [0,1]
+    return "Uncategorized", "#7391f5"
+
+
 # ------------------------
 # Model and Scaler Loaders
 # ------------------------
@@ -28,7 +52,7 @@ imputer = load_imputer()
 # ------------------------
 # Session state for resettable fields
 # ------------------------
-default_values = dict(age=79, cci=0, sofa=0, pbs=0)
+default_values = dict(age=79, cci=3, sofa=2, pbs=0)
 for k, v in default_values.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -117,7 +141,7 @@ if sofa > TRAINING_RANGES["sofa"]["max"]:
 
 if violations:
     st.warning(
-        "⚠️ One or more inputs are outside the range observed in the model’s training data:\n\n"
+        "⚠️ One or more inputs are outside the range observed in the model's training data:\n\n"
         + "\n".join([f"- {v}" for v in violations])
         + "\n\nPredictions in this region may be less reliable."
     )
@@ -139,55 +163,113 @@ if predict:
 
     # Predict mortality probability
     proba = model.predict_proba(X)[0][1]
+    relative = proba / BASELINE_RATE if BASELINE_RATE > 0 else float("nan")
+    risk_label, bar_color = categorize_risk(proba)
 
     # Display probability
     st.write("### Estimated Probability")
-    st.info(f"Model-estimated 30-day mortality probability: {proba * 100:.1f}%")
+    st.info(f"Model-estimated 30-day mortality probability is **{proba * 100:.1f}%**, "
+            f"which is **{relative:.1f}×** the cohort average ({BASELINE_RATE * 100:.0f}%).")
 
-    # Probability bar
+    # Segmented severity bar (four compartments with marker)
+    marker_left = min(max(proba * 100, 0), 100)
+    segments_html = "".join(
+        f"<div style='flex: {hi - lo}; background: {color}; height: 28px;'></div>"
+        for _, lo, hi, color in RISK_BINS
+    )
+    ticks_html = "".join(
+        f"""
+        <div style='position: absolute; left: {tick*100}%; top: 28px; transform: translateX(-50%); width: 1px; height: 10px; background: #666;'></div>
+        <div style='position: absolute; left: {tick*100}%; top: 40px; transform: translateX(-50%); font-size: 11px; color: #444;'>
+            {tick:.2f}
+        </div>
+        """
+        for tick in BOUNDARY_TICKS
+    )
     st.markdown(
         f"""
-        <div style='width: 100%; background: #f0f2f6; border-radius: 10px; height: 30px; margin-bottom: 10px;'>
-          <div style='width: {proba * 100:.1f}%; background: #7391f5; height: 30px; border-radius: 10px; text-align: right; color: black; padding-right: 10px; font-weight: bold;'>
-            {proba * 100:.1f}%
+        <div style='width: 100%; position: relative; margin: 8px 0 72px 0;'>
+          <div style='display: flex; border-radius: 12px; overflow: hidden; border: 1px solid #e0e0e0; height: 28px;'>
+            {segments_html}
+          </div>
+          <div style='position: absolute; left: {BASELINE_RATE*100}%; top: 32px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;'>
+            <div style='width: 2px; height: 28px; background: #1a1a1a; opacity: 0.8;'></div>
+            <div style='font-size: 10px; color: #1a1a1a; background: rgba(255,255,255,0.9); padding: 2px 6px; border-radius: 6px; border: 1px solid #d0d0d0; box-shadow: 0 1px 2px rgba(0,0,0,0.08); white-space: nowrap;'>
+              Cohort avg {BASELINE_RATE*100:.0f}%
+            </div>
+          </div>
+          <div style='position: absolute; left: {marker_left}%; top: -8px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px;'>
+            <div style='width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 8px solid #000;'></div>
+            <div style='font-size: 11px; color: #000; white-space: nowrap; background: rgba(255,255,255,0.85); padding: 0 2px; border-radius: 3px;'>{proba * 100:.1f}%</div>
+          </div>
+          {ticks_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Risk chip and bands under the bar
+    st.markdown(
+        f"""
+        <div style='margin: 10px 0 6px 0; padding: 10px 12px; border-radius: 10px; background: #eef6ff; border: 1px solid #d9e7ff;'>
+          <div style='display: inline-flex; align-items: center; gap: 8px; font-weight: 600;'>
+            <span>Risk category:</span>
+            <span style='padding: 4px 10px; border-radius: 999px; background: {bar_color}; color: #1a1a1a; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 1px 2px rgba(0,0,0,0.08);'>
+              {risk_label}
+            </span>
+          </div>
+          <div style='margin-top: 6px; font-size: 12px; color: #444;'>
+            Bands: Low &lt;0.10 · Moderate 0.10–0.25 · High 0.25–0.40 · Very high &gt;0.40
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # Threshold-based grouping
-    thresh = 0.5
-    if proba > thresh:
-        st.warning("Risk group (threshold = 0.5): HIGH")
-    else:
-        st.info("Risk group (threshold = 0.5): LOW")
 
-    # Download results as CSV
-    result_dict = {
-        "Age": [age],
-        "CCI": [cci],
-        "PBS": [pbs],
-        "SOFA": [sofa],
-        "Model-estimated probability (%)": [proba * 100],
-        "Threshold (for grouping)": [thresh],
-        "Risk group (based on threshold)": ["HIGH" if proba > thresh else "LOW"],
-    }
-    result_df = pd.DataFrame(result_dict)
-
-    csv = result_df.to_csv(index=False)
-    st.download_button(
-        label="Download results as CSV",
-        data=csv,
-        file_name="mortality_probability.csv",
-        mime="text/csv",
+    # ================================
+# Additional Details (Expandable)
+# ================================
+with st.expander("Additional Details"):
+    st.markdown("### Model Validation Summary")
+    st.markdown(
+        f"""
+        - **AUC (uncalibrated):** 0.767  
+        - **AUC (calibrated):** 0.763  
+        - **Brier score (calibrated):** 0.113  
+        - **Calibration intercept:** 0.05  
+        - **Calibration slope:** 1.02 
+        - **Baseline event rate (30-day mortality):** 15%  
+        """
     )
 
-    # Advanced/Debug Details
-    with st.expander("Show advanced details"):
-        st.write(f"Inputs: Age={age}, CCI={cci}, PBS={pbs}, SOFA={sofa}")
-        st.write(f"Output probability: {proba * 100:.1f}%")
-        st.write(f"Threshold for grouping: {thresh} ({thresh*100:.1f}%)")
+    st.markdown("### Methodological Notes & Citations")
+    st.markdown(
+        """
+        This risk model was trained on historical bloodstream infection (BSI) cases using:
+
+        - **XGBoost** classifier with class weighting  
+        - **Isotonic regression calibration** on a held-out 15% validation set  
+        - **Evaluation using the TRIPOD framework** principles for predictive modeling  
+
+        **Key sources:**
+
+        - Platt J. *Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods* (1999).  
+        - Zadrozny & Elkan. *Transforming Classifier Scores into Accurate Multiclass Probability Estimates* (2002).  
+        - Van Calster et al. *Calibration: the Achilles heel of predictive analytics* (2019).  
+        """
+    )
+
+    st.markdown("### Version Information")
+    st.markdown(
+        """
+        - **Model version:** 1.0.0  
+        - **Calibration method:** Isotonic regression  
+        - **App version:** 1.0.0  
+        - **Developer:** Lewis Research Group  
+        """
+    )
+
 
 # ------------------------
 # Footer: Disclaimer
