@@ -183,6 +183,27 @@ if predict:
     relative = proba / BASELINE_RATE if BASELINE_RATE > 0 else float("nan")
     risk_label, bar_color = categorize_risk(proba)
 
+
+    # Calibration plot comparing dataset calibration vs current prediction
+    if calibration_df is not None and not calibration_df.empty:
+        plot_df = calibration_df.sort_values("Age")
+        age_match = plot_df[plot_df["Age"] == age]
+        if age_match.empty:
+            nearest_idx = (plot_df["Age"] - age).abs().idxmin()
+            age_mean = float(plot_df.loc[nearest_idx, "Calibrated_prob_mean"])
+            age_q30 = float(plot_df.loc[nearest_idx, "q30"])
+            matched_age = float(plot_df.loc[nearest_idx, "Age"])
+            st.caption(f"No exact age match; using nearest age in data: {matched_age:.0f}.")
+        else:
+            age_mean = float(age_match["Calibrated_prob_mean"].mean())
+            age_q30 = float(age_match["q30"].mean())
+            matched_age = age
+
+        delta_pct_points = (proba - age_mean) * 100
+        direction = "higher" if delta_pct_points >= 0 else "lower"
+        delta_q30 = (proba - age_q30) * 100
+        direction_q30 = "higher" if delta_q30 >= 0 else "lower"
+
     # Display probability
     st.write("### Estimated Probability")
     st.info(f"Model-estimated 30-day mortality probability is **{proba * 100:.1f}%**, "
