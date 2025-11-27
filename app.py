@@ -141,7 +141,7 @@ if sofa > TRAINING_RANGES["sofa"]["max"]:
 
 if violations:
     st.warning(
-        "⚠️ One or more inputs are outside the range observed in the model’s training data:\n\n"
+        "⚠️ One or more inputs are outside the range observed in the model's training data:\n\n"
         + "\n".join([f"- {v}" for v in violations])
         + "\n\nPredictions in this region may be less reliable."
     )
