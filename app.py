@@ -317,7 +317,7 @@ if predict:
             </span>
           </div>
           <div style='margin-top: 6px; font-size: 12px; color: #444;'>
-            Bands: Low &lt;0.10 · Moderate 0.10–0.25 · High 0.25–0.40 · Very high &gt;0.40
+            Bands: Low &lt;0.10 · Moderate 0.10-0.25 · High 0.25-0.40 · Very high &gt;0.40
           </div>
         </div>
         """,
@@ -325,18 +325,17 @@ if predict:
     )
 
 
-    # ================================
+# ================================
 # Additional Details (Expandable)
 # ================================
 with st.expander("Additional Details"):
     st.markdown("### Model Validation Summary")
     st.markdown(
         f"""
-        - **AUC (uncalibrated):** 0.767  
-        - **AUC (calibrated):** 0.763  
-        - **Brier score (calibrated):** 0.113  
-        - **Calibration intercept:** 0.05  
-        - **Calibration slope:** 1.02 
+        - **Brier score (calibrated):** 0.1086
+        - **ECE (Error):** 0.0135
+        - **Calibration intercept:** -0.015  
+        - **Calibration slope:** 1.005 
         - **Baseline event rate (30-day mortality):** 15%  
         """
     )
