@@ -232,10 +232,7 @@ if predict:
             {segments_html}
           </div>
           <div style='position: absolute; left: {BASELINE_RATE*100}%; top: 32px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;'>
-            <div style='width: 2px; height: 28px; background: #1a1a1a; opacity: 0.8;'></div>
-            <div style='font-size: 10px; color: #1a1a1a; background: rgba(255,255,255,0.9); padding: 2px 6px; border-radius: 6px; border: 1px solid #d0d0d0; box-shadow: 0 1px 2px rgba(0,0,0,0.08); white-space: nowrap;'>
-              Cohort avg {BASELINE_RATE*100:.0f}%
-            </div>
+            
           </div>
           <div style='position: absolute; left: {marker_left}%; top: -8px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px;'>
             <div style='width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 8px solid #000;'></div>
