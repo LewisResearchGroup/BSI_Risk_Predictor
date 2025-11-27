@@ -48,6 +48,17 @@ def load_imputer():
     return None
 
 
+@st.cache_data
+def load_calibration_data(path: str):
+    """Load calibration CSV ensuring required columns are present."""
+    df = pd.read_csv(path)
+    required_cols = {"Age", "Calibrated_prob", "Calibrated_prob_mean", "q30"}
+    missing_cols = required_cols - set(df.columns)
+    if missing_cols:
+        raise ValueError(f"Missing columns in calibration file: {', '.join(sorted(missing_cols))}")
+    return df
+
+
 model = load_model()
 imputer = load_imputer()
 
