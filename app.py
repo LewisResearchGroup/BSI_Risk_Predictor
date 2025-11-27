@@ -52,7 +52,7 @@ imputer = load_imputer()
 # ------------------------
 # Session state for resettable fields
 # ------------------------
-default_values = dict(age=79, cci=0, sofa=0, pbs=0)
+default_values = dict(age=79, cci=3, sofa=2, pbs=0)
 for k, v in default_values.items():
     if k not in st.session_state:
         st.session_state[k] = v
