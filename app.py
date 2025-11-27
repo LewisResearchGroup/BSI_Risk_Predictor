@@ -226,38 +226,50 @@ if predict:
         unsafe_allow_html=True,
     )
 
-    # Threshold-based grouping
-    thresh = 0.5
-    if proba > thresh:
-        st.warning("Risk group (threshold = 0.5): HIGH")
-    else:
-        st.info("Risk group (threshold = 0.5): LOW")
 
-    # Download results as CSV
-    result_dict = {
-        "Age": [age],
-        "CCI": [cci],
-        "PBS": [pbs],
-        "SOFA": [sofa],
-        "Model-estimated probability (%)": [proba * 100],
-        "Threshold (for grouping)": [thresh],
-        "Risk group (based on threshold)": ["HIGH" if proba > thresh else "LOW"],
-    }
-    result_df = pd.DataFrame(result_dict)
-
-    csv = result_df.to_csv(index=False)
-    st.download_button(
-        label="Download results as CSV",
-        data=csv,
-        file_name="mortality_probability.csv",
-        mime="text/csv",
+    # ================================
+# Additional Details (Expandable)
+# ================================
+with st.expander("Additional Details"):
+    st.markdown("### Model Validation Summary")
+    st.markdown(
+        f"""
+        - **AUC (uncalibrated):** 0.767  
+        - **AUC (calibrated):** 0.763  
+        - **Brier score (calibrated):** 0.113  
+        - **Calibration intercept:** 0.05  
+        - **Calibration slope:** 1.02 
+        - **Baseline event rate (30-day mortality):** 15%  
+        """
     )
 
-    # Advanced/Debug Details
-    with st.expander("Show advanced details"):
-        st.write(f"Inputs: Age={age}, CCI={cci}, PBS={pbs}, SOFA={sofa}")
-        st.write(f"Output probability: {proba * 100:.1f}%")
-        st.write(f"Threshold for grouping: {thresh} ({thresh*100:.1f}%)")
+    st.markdown("### Methodological Notes & Citations")
+    st.markdown(
+        """
+        This risk model was trained on historical bloodstream infection (BSI) cases using:
+
+        - **XGBoost** classifier with class weighting  
+        - **Isotonic regression calibration** on a held-out 15% validation set  
+        - **Evaluation using the TRIPOD framework** principles for predictive modeling  
+
+        **Key sources:**
+
+        - Platt J. *Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods* (1999).  
+        - Zadrozny & Elkan. *Transforming Classifier Scores into Accurate Multiclass Probability Estimates* (2002).  
+        - Van Calster et al. *Calibration: the Achilles heel of predictive analytics* (2019).  
+        """
+    )
+
+    st.markdown("### Version Information")
+    st.markdown(
+        """
+        - **Model version:** 1.0.0  
+        - **Calibration method:** Isotonic regression  
+        - **App version:** 1.0.0  
+        - **Developer:** Lewis Research Group  
+        """
+    )
+
 
 # ------------------------
 # Footer: Disclaimer
