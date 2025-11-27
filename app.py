@@ -206,8 +206,9 @@ if predict:
 
     # Display probability
     st.write("### Estimated Probability")
-    st.info(f"Model-estimated 30-day mortality probability is **{proba * 100:.1f}%**, "
-            f"which is **{relative:.1f}×** the cohort average ({BASELINE_RATE * 100:.0f}%).")
+    st.info(f"Model-estimated 30-day mortality probability is **{proba * 100:.1f}%**, which is:\n"
+            f"- {abs(delta_pct_points):.1f} percentage points {direction} than the age-matched mean ({age_mean*100:.1f}%)\n"
+            f"- {abs(delta_q30):.1f} percentage points {direction_q30} than the age-matched US baseline ({age_q30*100:.1f}%)")
 
     # Segmented severity bar (four compartments with marker)
     marker_left = min(max(proba * 100, 0), 100)
