@@ -38,13 +38,13 @@ def load_model():
         return pickle.load(f)
     return None
 
-
-@st.cache_resource
-def load_imputer():
-    """Load the fitted imputer from disk."""
-    with open("imputer.pkl", "rb") as f:
-        return pickle.load(f)
-    return None
+# xgboost handles NaNs nativaely; imputer not strictly needed
+# @st.cache_resource
+# def load_imputer():
+#     """Load the fitted imputer from disk."""
+#     with open("imputer.pkl", "rb") as f:
+#         return pickle.load(f)
+#     return None
 
 
 @st.cache_data
@@ -167,13 +167,11 @@ with col2:
 if predict:
     # OPTIMIZATION: Load models/data ONLY on click
     model = load_model()
-    imputer = load_imputer()
     calibration_df = load_calibration_data("calibration_data.csv")
 
     # Prepare and scale features for prediction
     X = pd.DataFrame(np.array([[age, cci, pbs, sofa]]), 
                      columns=['AHS: NAGE_YR', 'COMORB: Charlson_WIC', 'S.SCORE: PBS', 'S.SCORE: SOFA'])
-    X = imputer.transform(X)
 
     # Predict mortality probability
     proba = model.predict_proba(X)[0][1]
