@@ -1,9 +1,7 @@
 import streamlit as st
 import numpy as np
 import pickle
-# REMOVED: import pandas as pd (Moved to inside functions)
-# REMOVED: import matplotlib.pyplot as plt (Moved to inside functions)
-# REMOVED: import seaborn as sns (Moved to inside functions)
+import pandas as pd
 
 # Baseline event rate (for contextualizing predictions)
 BASELINE_RATE = 0.15
@@ -52,9 +50,6 @@ def load_imputer():
 @st.cache_data
 def load_calibration_data(path: str):
     """Load calibration CSV ensuring required columns are present."""
-    # OPTIMIZATION: Lazy import pandas (saves ~4s on startup)
-    import pandas as pd
-    
     df = pd.read_csv(path)
     required_cols = {"Age", "Calibrated_prob", "Calibrated_prob_mean", "q30"}
     missing_cols = required_cols - set(df.columns)
@@ -176,7 +171,8 @@ if predict:
     calibration_df = load_calibration_data("calibration_data.csv")
 
     # Prepare and scale features for prediction
-    X = np.array([[age, cci, pbs, sofa]])
+    X = pd.DataFrame(np.array([[age, cci, pbs, sofa]]), 
+                     columns=['AHS: NAGE_YR', 'COMORB: Charlson_WIC', 'S.SCORE: PBS', 'S.SCORE: SOFA'])
     X = imputer.transform(X)
 
     # Predict mortality probability
