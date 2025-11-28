@@ -336,34 +336,32 @@ with st.expander("Additional Details"):
         - **ECE (Error):** 0.0135
         - **Calibration intercept:** -0.015
         - **Calibration slope:** 1.005
-        - **Baseline event rate (30-day mortality):** 15%
         """
     )
 
     st.markdown("### Methodological Notes & Citations")
     st.markdown(
         """
-        This risk model was trained on historical bloodstream infection (BSI) cases using:
+        This risk model was trained on the Calgary Bloodstream Infection Cohort (CBSIC) using:
 
-        - **XGBoost** classifier with class weighting  
-        - **Isotonic regression calibration** on a held-out 15% validation set  
-        - **Evaluation using the TRIPOD framework** principles for predictive modeling  
+        - **XGBoost** classifier with class weighting
+        - **Isotonic regression calibration** on a held-out 15% validation set
 
         **Key sources:**
 
-        - Platt J. *Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods* (1999).  
-        - Zadrozny & Elkan. *Transforming Classifier Scores into Accurate Multiclass Probability Estimates* (2002).  
-        - Van Calster et al. *Calibration: the Achilles heel of predictive analytics* (2019).  
+        - Platt J. *Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods* (1999).
+        - Zadrozny & Elkan. *Transforming Classifier Scores into Accurate Multiclass Probability Estimates* (2002).
+        - Van Calster et al. *Calibration: the Achilles heel of predictive analytics* (2019).
         """
     )
 
     st.markdown("### Version Information")
     st.markdown(
         """
-        - **Model version:** 1.0.0  
-        - **Calibration method:** Isotonic regression  
-        - **App version:** 1.0.0  
-        - **Developer:** Lewis Research Group  
+        - **Model version:** 1.0.0
+        - **Calibration method:** Isotonic regression
+        - **App version:** 1.0.0
+        - **Developer:** Lewis Research Group
         """
     )
 
