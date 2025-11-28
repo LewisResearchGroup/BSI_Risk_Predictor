@@ -33,6 +33,7 @@ def categorize_risk(p):
 @st.cache_resource
 def load_model():
     """Load the trained machine learning model from disk."""
+    # OPTIMIZATION: Implicitly loads xgboost only when this function is called
     with open("model.pkl", "rb") as f:
         return pickle.load(f)
     return None
@@ -46,13 +47,20 @@ def load_imputer():
     return None
 
 
-model = load_model()
-imputer = load_imputer()
+@st.cache_data
+def load_calibration_data(path: str):
+    """Load calibration CSV ensuring required columns are present."""
+    df = pd.read_csv(path)
+    required_cols = {"Age", "Calibrated_prob", "Calibrated_prob_mean", "q30"}
+    missing_cols = required_cols - set(df.columns)
+    if missing_cols:
+        raise ValueError(f"Missing columns in calibration file: {', '.join(sorted(missing_cols))}")
+    return df
 
 # ------------------------
 # Session state for resettable fields
 # ------------------------
-default_values = dict(age=79, cci=3, sofa=2, pbs=0)
+default_values = dict(age=79, cci=3, sofa=5, pbs=0)
 for k, v in default_values.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -157,8 +165,14 @@ with col2:
 # Prediction & Results
 # ------------------------
 if predict:
+    # OPTIMIZATION: Load models/data ONLY on click
+    model = load_model()
+    imputer = load_imputer()
+    calibration_df = load_calibration_data("calibration_data.csv")
+
     # Prepare and scale features for prediction
-    X = np.array([[age, cci, pbs, sofa]])
+    X = pd.DataFrame(np.array([[age, cci, pbs, sofa]]), 
+                     columns=['AHS: NAGE_YR', 'COMORB: Charlson_WIC', 'S.SCORE: PBS', 'S.SCORE: SOFA'])
     X = imputer.transform(X)
 
     # Predict mortality probability
@@ -166,10 +180,32 @@ if predict:
     relative = proba / BASELINE_RATE if BASELINE_RATE > 0 else float("nan")
     risk_label, bar_color = categorize_risk(proba)
 
+
+    # Calibration plot comparing dataset calibration vs current prediction
+    if calibration_df is not None and not calibration_df.empty:
+        plot_df = calibration_df.sort_values("Age")
+        age_match = plot_df[plot_df["Age"] == age]
+        if age_match.empty:
+            nearest_idx = (plot_df["Age"] - age).abs().idxmin()
+            age_mean = float(plot_df.loc[nearest_idx, "Calibrated_prob_mean"])
+            age_q30 = float(plot_df.loc[nearest_idx, "q30"])
+            matched_age = float(plot_df.loc[nearest_idx, "Age"])
+            st.caption(f"No exact age match; using nearest age in data: {matched_age:.0f}.")
+        else:
+            age_mean = float(age_match["Calibrated_prob_mean"].mean())
+            age_q30 = float(age_match["q30"].mean())
+            matched_age = age
+
+        delta_pct_points = (proba - age_mean) * 100
+        direction = "higher" if delta_pct_points >= 0 else "lower"
+        delta_q30 = (proba - age_q30) * 100
+        direction_q30 = "higher" if delta_q30 >= 0 else "lower"
+
     # Display probability
     st.write("### Estimated Probability")
-    st.info(f"Model-estimated 30-day mortality probability is **{proba * 100:.1f}%**, "
-            f"which is **{relative:.1f}×** the cohort average ({BASELINE_RATE * 100:.0f}%).")
+    st.info(f"Model-estimated 30-day mortality probability is **{proba * 100:.1f}%**, which is:\n"
+            f"- {abs(delta_pct_points):.1f} percentage points {direction} than the age-matched mean in the BSI cohort ({age_mean*100:.1f}%)\n"
+            f"- {abs(delta_q30):.1f} percentage points {direction_q30} than the age-matched US 30-day mortality baseline ({age_q30*100:.1f}%)")
 
     # Segmented severity bar (four compartments with marker)
     marker_left = min(max(proba * 100, 0), 100)
@@ -193,10 +229,7 @@ if predict:
             {segments_html}
           </div>
           <div style='position: absolute; left: {BASELINE_RATE*100}%; top: 32px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;'>
-            <div style='width: 2px; height: 28px; background: #1a1a1a; opacity: 0.8;'></div>
-            <div style='font-size: 10px; color: #1a1a1a; background: rgba(255,255,255,0.9); padding: 2px 6px; border-radius: 6px; border: 1px solid #d0d0d0; box-shadow: 0 1px 2px rgba(0,0,0,0.08); white-space: nowrap;'>
-              Cohort avg {BASELINE_RATE*100:.0f}%
-            </div>
+            
           </div>
           <div style='position: absolute; left: {marker_left}%; top: -8px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px;'>
             <div style='width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 8px solid #000;'></div>
@@ -207,6 +240,71 @@ if predict:
         """,
         unsafe_allow_html=True,
     )
+
+    # Calibration plot comparing dataset calibration vs current prediction
+    if calibration_df is not None and not calibration_df.empty:
+        # OPTIMIZATION: Heavy plotting libraries loaded ONLY here
+        import matplotlib
+        matplotlib.use('Agg') # Prevents searching for GUI backends (Tk, Qt)
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        plot_df = calibration_df.sort_values("Age")
+        age_match = plot_df[plot_df["Age"] == age]
+        if age_match.empty:
+            nearest_idx = (plot_df["Age"] - age).abs().idxmin()
+            age_mean = float(plot_df.loc[nearest_idx, "Calibrated_prob_mean"])
+            matched_age = float(plot_df.loc[nearest_idx, "Age"])
+            st.caption(f"No exact age match; using nearest age in data: {matched_age:.0f}.")
+        else:
+            age_mean = float(age_match["Calibrated_prob_mean"].mean())
+            matched_age = age
+
+        fig, ax = plt.subplots(figsize=(5.2, 4.2))
+        sns.pointplot(data=plot_df, x="Age", y="Calibrated_prob", color="#bbbbbb", errorbar=None, ax=ax, linewidth=0.3)
+        sns.pointplot(data=plot_df, x="Age", y="q30", color="#2ca02c", errorbar=None, ax=ax, linewidth=0.4)
+
+        ax.tick_params(axis="both", which="both", length=0)
+        sns.despine(left=True, bottom=True)
+
+        ax.set_xticks([0, 20, 40, 60, 80, 100])
+        ax.set_xticklabels(["0", "20", "40", "60", "80", "100"])
+
+        ax.scatter([age], [proba], color=bar_color, s=90, zorder=4, edgecolor="white", linewidth=0.8)
+        ax.scatter([matched_age], [age_mean], color="#bbbbbb", s=70, zorder=5, edgecolor="white", linewidth=0.8)
+        ax.scatter([matched_age], [age_q30], color="#2ca02c", s=70, zorder=5, edgecolor="white", linewidth=0.8)
+        ax.set_xlabel("Age (Years)", labelpad=10)
+        ax.set_ylabel("Calibrated probability", labelpad=10)
+
+        def annotate_point(x_val, y_val, text, color, dx=6, dy=0.05):
+            """Attach a floating label with an arrow to a point."""
+            target_y = min(max(y_val + dy, 0), 1)
+            ha = "left" if dx >= 0 else "right"
+            ax.annotate(
+                text,
+                xy=(x_val, y_val),
+                xytext=(x_val + dx, target_y),
+                textcoords="data",
+                ha=ha,
+                va="center",
+                fontsize=10,
+                bbox=dict(boxstyle="round,pad=0.35", fc="white", ec=color, lw=1),
+                arrowprops=dict(arrowstyle="-", color=color, lw=1),
+            )
+
+        if age > 35:
+            annotate_point(age, proba, f"Patient: {proba*100:.1f}%", bar_color, dx=8, dy=0.05)
+            annotate_point(matched_age, age_mean, f"Cohort: {age_mean*100:.1f}%", "#7a7a7a", dx=-10, dy=0.05)
+            annotate_point(matched_age, age_q30, f"US q30: {age_q30*100:.1f}%", "#2ca02c", dx=-4, dy=0.05)
+        else:
+            annotate_point(age, proba, f"Patient: {proba*100:.1f}%", bar_color, dx=8, dy=0.05)
+            annotate_point(matched_age, age_mean, f"Cohort: {age_mean*100:.1f}%", "#7a7a7a", dx=-5, dy=0)
+            annotate_point(matched_age, age_q30, f"US q30: {age_q30*100:.1f}%", "#2ca02c", dx=5, dy=0)
+
+        ax.grid(axis="y", linestyle=":", alpha=0.35)
+        st.pyplot(fig)
+    else:
+        st.info("Provide a calibration CSV path to see the calibration point plot and comparison to the dataset mean.")
 
     # Risk chip and bands under the bar
     st.markdown(
@@ -219,7 +317,7 @@ if predict:
             </span>
           </div>
           <div style='margin-top: 6px; font-size: 12px; color: #444;'>
-            Bands: Low &lt;0.10 · Moderate 0.10–0.25 · High 0.25–0.40 · Very high &gt;0.40
+            Bands: Low &lt;0.10 · Moderate 0.10-0.25 · High 0.25-0.40 · Very high &gt;0.40
           </div>
         </div>
         """,
@@ -227,46 +325,43 @@ if predict:
     )
 
 
-    # ================================
+# ================================
 # Additional Details (Expandable)
 # ================================
 with st.expander("Additional Details"):
     st.markdown("### Model Validation Summary")
     st.markdown(
         f"""
-        - **AUC (uncalibrated):** 0.767  
-        - **AUC (calibrated):** 0.763  
-        - **Brier score (calibrated):** 0.113  
-        - **Calibration intercept:** 0.05  
-        - **Calibration slope:** 1.02 
-        - **Baseline event rate (30-day mortality):** 15%  
+        - **Brier score (calibrated):** 0.1086
+        - **ECE (Error):** 0.0135
+        - **Calibration intercept:** -0.015
+        - **Calibration slope:** 1.005
         """
     )
 
     st.markdown("### Methodological Notes & Citations")
     st.markdown(
         """
-        This risk model was trained on historical bloodstream infection (BSI) cases using:
+        This risk model was trained on the Calgary Bloodstream Infection Cohort (CBSIC) using:
 
-        - **XGBoost** classifier with class weighting  
-        - **Isotonic regression calibration** on a held-out 15% validation set  
-        - **Evaluation using the TRIPOD framework** principles for predictive modeling  
+        - **XGBoost** classifier with class weighting
+        - **Isotonic regression calibration** on a held-out 15% validation set
 
         **Key sources:**
 
-        - Platt J. *Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods* (1999).  
-        - Zadrozny & Elkan. *Transforming Classifier Scores into Accurate Multiclass Probability Estimates* (2002).  
-        - Van Calster et al. *Calibration: the Achilles heel of predictive analytics* (2019).  
+        - Platt J. *Probabilistic Outputs for Support Vector Machines and Comparisons to Regularized Likelihood Methods* (1999).
+        - Zadrozny & Elkan. *Transforming Classifier Scores into Accurate Multiclass Probability Estimates* (2002).
+        - Van Calster et al. *Calibration: the Achilles heel of predictive analytics* (2019).
         """
     )
 
     st.markdown("### Version Information")
     st.markdown(
         """
-        - **Model version:** 1.0.0  
-        - **Calibration method:** Isotonic regression  
-        - **App version:** 1.0.0  
-        - **Developer:** Lewis Research Group  
+        - **Model version:** 1.0.0
+        - **Calibration method:** Isotonic regression
+        - **App version:** 1.0.0
+        - **Developer:** Lewis Research Group
         """
     )
 
