@@ -289,13 +289,13 @@ if predict:
                 arrowprops=dict(arrowstyle="-", color=color, lw=1),
             )
 
-        if age > 40:
+        if age > 35:
             annotate_point(age, proba, f"Patient: {proba*100:.1f}%", bar_color, dx=8, dy=0.05)
             annotate_point(matched_age, age_mean, f"Cohort: {age_mean*100:.1f}%", "#7a7a7a", dx=-10, dy=0.05)
             annotate_point(matched_age, age_q30, f"US q30: {age_q30*100:.1f}%", "#2ca02c", dx=-4, dy=0.05)
         else:
-            annotate_point(age, proba, f"Patient: {proba*100:.1f}%", bar_color, dx=5, dy=0)
-            annotate_point(matched_age, age_mean, f"Cohort: {age_mean*100:.1f}%", "#7a7a7a", dx=5, dy=0)
+            annotate_point(age, proba, f"Patient: {proba*100:.1f}%", bar_color, dx=8, dy=0.05)
+            annotate_point(matched_age, age_mean, f"Cohort: {age_mean*100:.1f}%", "#7a7a7a", dx=-5, dy=0)
             annotate_point(matched_age, age_q30, f"US q30: {age_q30*100:.1f}%", "#2ca02c", dx=5, dy=0)
 
         ax.grid(axis="y", linestyle=":", alpha=0.35)
