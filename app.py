@@ -3,6 +3,55 @@ import numpy as np
 import pickle
 import pandas as pd
 
+# -----------------------------
+# Widen the main content area
+# -----------------------------
+st.markdown("""
+<style>
+
+/* --- widen main content area --- */
+.block-container {
+    max-width: 1400px;      /* adjust to your preference */
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+}
+
+/* Optional: widen the sidebar */
+[data-testid="stSidebar"] {
+    width: 320px !important;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+st.markdown("""
+<style>
+
+/* Desktop-only scaling */
+@media (min-width: 900px) {
+
+    /* Increase all normal text */
+    html, body, p, span, div, [class*="stMarkdown"], [class*="css"] {
+        font-size: 1.12rem !important;   /* <= this is the sweet spot */
+        line-height: 1.45 !important;
+    }
+
+    /* Slightly larger input labels */
+    label, .stNumberInput label, .stTextInput label {
+        font-size: 1.10rem !important;
+    }
+
+    /* Keep headers proportional (do NOT overgrow them) */
+    h1 { font-size: 2.1rem !important; }
+    h2 { font-size: 1.55rem !important; }
+    h3 { font-size: 1.28rem !important; }
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
 # Baseline event rate (for contextualizing predictions)
 BASELINE_RATE = 0.15
 
@@ -38,13 +87,13 @@ def load_model():
         return pickle.load(f)
     return None
 
-
-@st.cache_resource
-def load_imputer():
-    """Load the fitted imputer from disk."""
-    with open("imputer.pkl", "rb") as f:
-        return pickle.load(f)
-    return None
+# xgboost handles NaNs nativaely; imputer not strictly needed
+# @st.cache_resource
+# def load_imputer():
+#     """Load the fitted imputer from disk."""
+#     with open("imputer.pkl", "rb") as f:
+#         return pickle.load(f)
+#     return None
 
 
 @st.cache_data
@@ -167,13 +216,11 @@ with col2:
 if predict:
     # OPTIMIZATION: Load models/data ONLY on click
     model = load_model()
-    imputer = load_imputer()
     calibration_df = load_calibration_data("calibration_data.csv")
 
     # Prepare and scale features for prediction
     X = pd.DataFrame(np.array([[age, cci, pbs, sofa]]), 
                      columns=['AHS: NAGE_YR', 'COMORB: Charlson_WIC', 'S.SCORE: PBS', 'S.SCORE: SOFA'])
-    X = imputer.transform(X)
 
     # Predict mortality probability
     proba = model.predict_proba(X)[0][1]
@@ -209,28 +256,34 @@ if predict:
 
     # Segmented severity bar (four compartments with marker)
     marker_left = min(max(proba * 100, 0), 100)
+    # 1. CHANGE: Set inner segments to height: 100% (so they fill the parent container)
     segments_html = "".join(
-        f"<div style='flex: {hi - lo}; background: {color}; height: 28px;'></div>"
+        f"<div style='flex: {hi - lo}; background: {color}; height: 100%;'></div>"
         for _, lo, hi, color in RISK_BINS
     )
+
+    # 2. CHANGE: Adjust 'top' position for ticks because the bar is now taller
+    # Old top: 28px (line) / 40px (text) -> New top: 48px (line) / 60px (text)
     ticks_html = "".join(
         f"""
-        <div style='position: absolute; left: {tick*100}%; top: 28px; transform: translateX(-50%); width: 1px; height: 10px; background: #666;'></div>
-        <div style='position: absolute; left: {tick*100}%; top: 40px; transform: translateX(-50%); font-size: 11px; color: #444;'>
+        <div style='position: absolute; left: {tick*100}%; top: 48px; transform: translateX(-50%); width: 1px; height: 10px; background: #666;'></div>
+        <div style='position: absolute; left: {tick*100}%; top: 60px; transform: translateX(-50%); font-size: 11px; color: #444;'>
             {tick:.2f}
         </div>
         """
         for tick in BOUNDARY_TICKS
     )
+
     st.markdown(
         f"""
         <div style='width: 100%; position: relative; margin: 8px 0 72px 0;'>
-          <div style='display: flex; border-radius: 12px; overflow: hidden; border: 1px solid #e0e0e0; height: 28px;'>
+          <div style='display: flex; border-radius: 24px; overflow: hidden; border: 1px solid #e0e0e0; height: 48px;'>
             {segments_html}
           </div>
-          <div style='position: absolute; left: {BASELINE_RATE*100}%; top: 32px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;'>
-            
+          
+          <div style='position: absolute; left: {BASELINE_RATE*100}%; top: 52px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;'>
           </div>
+
           <div style='position: absolute; left: {marker_left}%; top: -8px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px;'>
             <div style='width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 8px solid #000;'></div>
             <div style='font-size: 11px; color: #000; white-space: nowrap; background: rgba(255,255,255,0.85); padding: 0 2px; border-radius: 3px;'>{proba * 100:.1f}%</div>
