@@ -256,28 +256,34 @@ if predict:
 
     # Segmented severity bar (four compartments with marker)
     marker_left = min(max(proba * 100, 0), 100)
+    # 1. CHANGE: Set inner segments to height: 100% (so they fill the parent container)
     segments_html = "".join(
-        f"<div style='flex: {hi - lo}; background: {color}; height: 28px;'></div>"
+        f"<div style='flex: {hi - lo}; background: {color}; height: 100%;'></div>"
         for _, lo, hi, color in RISK_BINS
     )
+
+    # 2. CHANGE: Adjust 'top' position for ticks because the bar is now taller
+    # Old top: 28px (line) / 40px (text) -> New top: 48px (line) / 60px (text)
     ticks_html = "".join(
         f"""
-        <div style='position: absolute; left: {tick*100}%; top: 28px; transform: translateX(-50%); width: 1px; height: 10px; background: #666;'></div>
-        <div style='position: absolute; left: {tick*100}%; top: 40px; transform: translateX(-50%); font-size: 11px; color: #444;'>
+        <div style='position: absolute; left: {tick*100}%; top: 48px; transform: translateX(-50%); width: 1px; height: 10px; background: #666;'></div>
+        <div style='position: absolute; left: {tick*100}%; top: 60px; transform: translateX(-50%); font-size: 11px; color: #444;'>
             {tick:.2f}
         </div>
         """
         for tick in BOUNDARY_TICKS
     )
+
     st.markdown(
         f"""
         <div style='width: 100%; position: relative; margin: 8px 0 72px 0;'>
-          <div style='display: flex; border-radius: 24px; overflow: hidden; border: 1px solid #e0e0e0; height: 28px;'>
+          <div style='display: flex; border-radius: 24px; overflow: hidden; border: 1px solid #e0e0e0; height: 48px;'>
             {segments_html}
           </div>
-          <div style='position: absolute; left: {BASELINE_RATE*100}%; top: 32px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;'>
-            
+          
+          <div style='position: absolute; left: {BASELINE_RATE*100}%; top: 52px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;'>
           </div>
+
           <div style='position: absolute; left: {marker_left}%; top: -8px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px;'>
             <div style='width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 8px solid #000;'></div>
             <div style='font-size: 11px; color: #000; white-space: nowrap; background: rgba(255,255,255,0.85); padding: 0 2px; border-radius: 3px;'>{proba * 100:.1f}%</div>
