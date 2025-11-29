@@ -3,6 +3,55 @@ import numpy as np
 import pickle
 import pandas as pd
 
+# -----------------------------
+# Widen the main content area
+# -----------------------------
+st.markdown("""
+<style>
+
+/* --- widen main content area --- */
+.block-container {
+    max-width: 1400px;      /* adjust to your preference */
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+}
+
+/* Optional: widen the sidebar */
+[data-testid="stSidebar"] {
+    width: 320px !important;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+st.markdown("""
+<style>
+
+/* Desktop-only scaling */
+@media (min-width: 900px) {
+
+    /* Increase all normal text */
+    html, body, p, span, div, [class*="stMarkdown"], [class*="css"] {
+        font-size: 1.12rem !important;   /* <= this is the sweet spot */
+        line-height: 1.45 !important;
+    }
+
+    /* Slightly larger input labels */
+    label, .stNumberInput label, .stTextInput label {
+        font-size: 1.10rem !important;
+    }
+
+    /* Keep headers proportional (do NOT overgrow them) */
+    h1 { font-size: 2.1rem !important; }
+    h2 { font-size: 1.55rem !important; }
+    h3 { font-size: 1.28rem !important; }
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
 # Baseline event rate (for contextualizing predictions)
 BASELINE_RATE = 0.15
 
@@ -223,7 +272,7 @@ if predict:
     st.markdown(
         f"""
         <div style='width: 100%; position: relative; margin: 8px 0 72px 0;'>
-          <div style='display: flex; border-radius: 12px; overflow: hidden; border: 1px solid #e0e0e0; height: 28px;'>
+          <div style='display: flex; border-radius: 24px; overflow: hidden; border: 1px solid #e0e0e0; height: 28px;'>
             {segments_html}
           </div>
           <div style='position: absolute; left: {BASELINE_RATE*100}%; top: 32px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;'>
