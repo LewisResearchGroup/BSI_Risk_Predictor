@@ -200,25 +200,25 @@ def parse_num(val):
         return None
 
 
-age_val = parse_num(age)
-cci_val = parse_num(cci)
-pbs_val = parse_num(pbs)
-sofa_val = parse_num(sofa)
+# Store parsed values in a dictionary for easier fallback handling
+parsed_vals = {
+    "age": parse_num(age),
+    "cci": parse_num(cci),
+    "pbs": parse_num(pbs),
+    "sofa": parse_num(sofa),
+}
 
 fallback_used = []
-if age_val is None:
-    age_val = fallback_defaults["age"]
-    fallback_used.append(f"Age: {age_val}")
-if cci_val is None:
-    cci_val = fallback_defaults["cci"]
-    fallback_used.append(f"CCI: {cci_val}")
-if pbs_val is None:
-    pbs_val = fallback_defaults["pbs"]
-    fallback_used.append(f"PBS: {pbs_val}")
-if sofa_val is None:
-    sofa_val = fallback_defaults["sofa"]
-    fallback_used.append(f"SOFA: {sofa_val}")
+for field in ["age", "cci", "pbs", "sofa"]:
+    if parsed_vals[field] is None:
+        parsed_vals[field] = fallback_defaults[field]
+        fallback_used.append(f"{field.upper()}: {parsed_vals[field]}")
 
+# Unpack back to individual variables for downstream code
+age_val = parsed_vals["age"]
+cci_val = parsed_vals["cci"]
+pbs_val = parsed_vals["pbs"]
+sofa_val = parsed_vals["sofa"]
 violations = []
 if age_val < TRAINING_RANGES["age"]["min"] or age_val > TRAINING_RANGES["age"]["max"]:
     violations.append(f"Age={age_val} (trained range: {TRAINING_RANGES['age']['min']}-{TRAINING_RANGES['age']['max']})")
