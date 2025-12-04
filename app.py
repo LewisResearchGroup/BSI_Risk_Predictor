@@ -448,7 +448,7 @@ if predict:
 
             ax.grid(axis="y", linestyle=":", alpha=0.35)
             ax.margins(x=0, y=0.02)
-            st.pyplot(fig, bbox_inches="tight", pad_inches=0.05)
+            st.pyplot(fig)
         else:
             st.info("Provide a calibration CSV path to see the calibration point plot and comparison to the dataset mean.")
 
