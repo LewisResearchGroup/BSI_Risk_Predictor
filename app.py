@@ -172,10 +172,10 @@ sofa_info = (
 age_info = "Patient's age in years."
 
 # Feature inputs (linked to session_state for reset functionality)
-age = st.text_input("Age (years)", key="age", placeholder="e.g., 75", help=age_info)
-cci = st.text_input("Charlson Comorbidity Index (CCI)", key="cci", placeholder="e.g., 3", help=cci_info)
-pbs = st.text_input("PBS Score", key="pbs", placeholder="e.g., 0", help=pbs_info)
-sofa = st.text_input("SOFA Score", key="sofa", placeholder="e.g., 5", help=sofa_info)
+age = st.text_input("Age (years)", key="age", placeholder="A number between 0 and 100. Default: 63", help=age_info)
+cci = st.text_input("Charlson Comorbidity Index (CCI)", key="cci", placeholder="A number between 0 and 17. Default: 0", help=cci_info)
+pbs = st.text_input("PBS Score", key="pbs", placeholder="A number between 0 and 14. Default: 0", help=pbs_info)
+sofa = st.text_input("SOFA Score", key="sofa", placeholder="A number between 0 and 24. Default: 0", help=sofa_info)
 
 # --------------------------------
 # Training ranges (from your dataset)
