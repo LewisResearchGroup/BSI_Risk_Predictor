@@ -220,14 +220,14 @@ if sofa_val is None:
     fallback_used.append(f"SOFA: {sofa_val}")
 
 violations = []
-if age_val > TRAINING_RANGES["age"]["max"]:
-    violations.append(f"Age={age_val} (trained up to {TRAINING_RANGES['age']['max']})")
-if cci_val > TRAINING_RANGES["cci"]["max"]:
-    violations.append(f"CCI={cci_val} (trained up to {TRAINING_RANGES['cci']['max']})")
-if pbs_val > TRAINING_RANGES["pbs"]["max"]:
-    violations.append(f"PBS={pbs_val} (trained up to {TRAINING_RANGES['pbs']['max']})")
-if sofa_val > TRAINING_RANGES["sofa"]["max"]:
-    violations.append(f"SOFA={sofa_val} (trained up to {TRAINING_RANGES['sofa']['max']})")
+if age_val < TRAINING_RANGES["age"]["min"] or age_val > TRAINING_RANGES["age"]["max"]:
+    violations.append(f"Age={age_val} (trained range: {TRAINING_RANGES['age']['min']}-{TRAINING_RANGES['age']['max']})")
+if cci_val < TRAINING_RANGES["cci"]["min"] or cci_val > TRAINING_RANGES["cci"]["max"]:
+    violations.append(f"CCI={cci_val} (trained range: {TRAINING_RANGES['cci']['min']}-{TRAINING_RANGES['cci']['max']})")
+if pbs_val < TRAINING_RANGES["pbs"]["min"] or pbs_val > TRAINING_RANGES["pbs"]["max"]:
+    violations.append(f"PBS={pbs_val} (trained range: {TRAINING_RANGES['pbs']['min']}-{TRAINING_RANGES['pbs']['max']})")
+if sofa_val < TRAINING_RANGES["sofa"]["min"] or sofa_val > TRAINING_RANGES["sofa"]["max"]:
+    violations.append(f"SOFA={sofa_val} (trained range: {TRAINING_RANGES['sofa']['min']}-{TRAINING_RANGES['sofa']['max']})")
 
 if violations:
     st.warning(
