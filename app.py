@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import pickle
 import pandas as pd
+import math
 
 # -----------------------------
 # Widen the main content area
@@ -111,7 +112,7 @@ def load_calibration_data(path: str):
 # Session state for resettable fields
 # ------------------------
 default_values = dict(age="", cci="", pbs="", sofa="")
-fallback_defaults = dict(age=63, cci=0, pbs=0, sofa=0)  # used when fields are left blank
+fallback_defaults = dict(age=63, cci=2, pbs=0, sofa=0)  # used when fields are left blank; we used cci=2 because that's the cci for a 63-year-old person with no comorbidities
 for k, v in default_values.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -173,7 +174,7 @@ age_info = "Patient's age in years."
 
 # Feature inputs (linked to session_state for reset functionality)
 age = st.text_input("Age (years)", key="age", placeholder="A number between 0 and 100. Default: 63", help=age_info)
-cci = st.text_input("Charlson Comorbidity Index (CCI)", key="cci", placeholder="A number between 0 and 17. Default: 0", help=cci_info)
+cci = st.text_input("Charlson Comorbidity Index (CCI)", key="cci", placeholder="A number between 0 and 17. Default: 2", help=cci_info)
 pbs = st.text_input("PBS Score", key="pbs", placeholder="A number between 0 and 14. Default: 0", help=pbs_info)
 sofa = st.text_input("SOFA Score", key="sofa", placeholder="A number between 0 and 24. Default: 0", help=sofa_info)
 
@@ -189,30 +190,54 @@ TRAINING_RANGES = {
 
 # Parse user text inputs; fall back to default scenario if blank/unparseable
 def parse_num(val):
+    """Return (parsed_value, reason) where reason is None when parsing succeeds."""
     try:
         if val is None:
-            return None
+            return None, "blank"
         stripped = str(val).strip()
         if stripped == "":
-            return None
-        return float(stripped)
-    except (ValueError, TypeError):
-        return None
+            return None, "blank"
+        num = float(stripped)
+        if not math.isfinite(num):
+            return None, "non-finite"
+        return num, None
+    except (ValueError, TypeError, OverflowError):
+        return None, "not-a-number"
 
 
 # Store parsed values in a dictionary for easier fallback handling
 parsed_vals = {
-    "age": parse_num(age),
-    "cci": parse_num(cci),
-    "pbs": parse_num(pbs),
-    "sofa": parse_num(sofa),
+    "age": None,
+    "cci": None,
+    "pbs": None,
+    "sofa": None,
 }
+parse_reasons = {}
+
+for field_key, raw_val in [("age", age), ("cci", cci), ("pbs", pbs), ("sofa", sofa)]:
+    parsed, reason = parse_num(raw_val)
+    parsed_vals[field_key] = parsed
+    parse_reasons[field_key] = reason
 
 fallback_used = []
+fallback_invalid = []
+fallback_blanks = []
+reason_labels = {
+    "blank": "left blank",
+    "not-a-number": "not a number",
+    "non-finite": "not a finite number",
+}
 for field in ["age", "cci", "pbs", "sofa"]:
     if parsed_vals[field] is None:
         parsed_vals[field] = fallback_defaults[field]
-        fallback_used.append(f"{field.upper()}: {parsed_vals[field]}")
+        reason = parse_reasons.get(field)
+        reason_label = reason_labels.get(reason, "invalid input")
+        entry = f"{field.upper()}: {parsed_vals[field]} ({reason_label})"
+        fallback_used.append(entry)
+        if reason != "blank":
+            fallback_invalid.append(entry)
+        else:
+            fallback_blanks.append(entry)
 
 # Unpack back to individual variables for downstream code
 age_val = parsed_vals["age"]
@@ -235,8 +260,13 @@ if violations:
         + "\n".join([f"- {v}" for v in violations])
         + "\n\nPredictions in this region may be less reliable."
     )
-elif fallback_used:
-    st.caption(f"Using default values for empty fields: {', '.join(fallback_used)}. You can enter values to override these defaults.")
+if fallback_invalid:
+    st.warning(
+        "⚠️ Some entries were invalid and replaced with defaults:\n\n"
+        + "\n".join([f"- {entry}" for entry in fallback_invalid])
+    )
+if fallback_blanks:
+    st.caption(f"Using default values for empty fields: {', '.join(fallback_blanks)}. You can enter values to override these defaults.")
 
 # Predict and Reset buttons side-by-side
 col1, col2 = st.columns([1, 1])
@@ -401,6 +431,7 @@ if predict:
             matplotlib.use('Agg') # Prevents searching for GUI backends (Tk, Qt)
             import matplotlib.pyplot as plt
             import seaborn as sns
+            from matplotlib.ticker import FuncFormatter
 
             if age_note:
                 st.caption(age_note)
@@ -415,11 +446,16 @@ if predict:
             ax.set_xticks([0, 20, 40, 60, 80, 100])
             ax.set_xticklabels(["0", "20", "40", "60", "80", "100"])
 
+            # yticks = ax.get_yticks()
+            # ax.set_yticklabels([f"{int(t * 100)}" for t in yticks])
+
+            ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{int(y * 100)}"))
+
             ax.scatter([age_val], [proba], color=bar_color, s=90, zorder=4, edgecolor="white", linewidth=0.8)
             ax.scatter([matched_age], [age_mean], color="#bbbbbb", s=70, zorder=5, edgecolor="white", linewidth=0.8)
             ax.scatter([matched_age], [age_q30], color="#2ca02c", s=70, zorder=5, edgecolor="white", linewidth=0.8)
             ax.set_xlabel("Age (Years)", labelpad=10)
-            ax.set_ylabel("Calibrated probability", labelpad=10)
+            ax.set_ylabel("Calibrated Probability [%]", labelpad=10)
 
             def annotate_point(x_val, y_val, text, color, dx=6, dy=0.05):
                 """Attach a floating label with an arrow to a point."""
@@ -470,7 +506,7 @@ with st.expander("Additional Details"):
     st.markdown("### Methodological Notes & Citations")
     st.markdown(
         """
-        This risk model was trained on the Calgary Bloodstream Infection Cohort (CBSIC) using:
+        This risk model was trained on the Calgary Bloodstream Infection Cohort (_CBSIC_) using:
 
         - **XGBoost** classifier with class weighting
         - **Isotonic regression calibration** on a held-out 15% validation set
