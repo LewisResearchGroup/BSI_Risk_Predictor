@@ -2,7 +2,6 @@ import streamlit as st
 import numpy as np
 import pickle
 import pandas as pd
-import math
 
 # -----------------------------
 # Widen the main content area
@@ -111,17 +110,19 @@ def load_calibration_data(path: str):
 # ------------------------
 # Session state for resettable fields
 # ------------------------
-default_values = dict(age="", cci="", pbs="", sofa="")
-fallback_defaults = dict(age=63, cci=2, pbs=0, sofa=0)  # used when fields are left blank; we used cci=2 because that's the cci for a 63-year-old person with no comorbidities
+default_values = dict(age=63, cci=2, pbs=0, sofa=0)
 for k, v in default_values.items():
     if k not in st.session_state:
         st.session_state[k] = v
+if "prediction_inputs" not in st.session_state:
+    st.session_state.prediction_inputs = None
 
 
 def reset_form():
-    """Reset all user-editable fields to defaults."""
+    """Reset all user-editable fields to defaults and clear the current estimate."""
     for k, v in default_values.items():
         st.session_state[k] = v
+    st.session_state.prediction_inputs = None
 
 
 # ------------------------
@@ -152,8 +153,16 @@ with st.sidebar:
 # ------------------------
 # Main App Interface
 # ------------------------
-st.title("Model-Based Estimate of 30-Day Mortality Probability")
-st.header("Enter Patient Data")
+title_col, spacer_col = st.columns([6, 1.4], vertical_alignment="top")
+with title_col:
+    st.title("Model-Based Estimate of 30-Day Mortality Probability")
+    st.header("Enter Patient Data")
+
+caption_col, reset_col = st.columns([5, 0.4], vertical_alignment="center")
+with caption_col:
+    st.caption("Enter the four model inputs below, then submit the form to generate an estimate.")
+with reset_col:
+    st.button("Reset", on_click=reset_form, use_container_width=True)
 
 # Tooltips for each feature
 cci_info = (
@@ -172,12 +181,6 @@ sofa_info = (
 )
 age_info = "Patient's age in years."
 
-# Feature inputs (linked to session_state for reset functionality)
-age = st.text_input("Age (years)", key="age", placeholder="A number between 0 and 100. Default: 63", help=age_info)
-cci = st.text_input("Charlson Comorbidity Index (CCI)", key="cci", placeholder="A number between 0 and 17. Default: 2", help=cci_info)
-pbs = st.text_input("PBS Score", key="pbs", placeholder="A number between 0 and 14. Default: 0", help=pbs_info)
-sofa = st.text_input("SOFA Score", key="sofa", placeholder="A number between 0 and 24. Default: 0", help=sofa_info)
-
 # --------------------------------
 # Training ranges (from your dataset)
 # --------------------------------
@@ -188,97 +191,66 @@ TRAINING_RANGES = {
     "sofa": {"min": 0, "max": 24},
 }
 
-# Parse user text inputs; fall back to default scenario if blank/unparseable
-def parse_num(val):
-    """Return (parsed_value, reason) where reason is None when parsing succeeds."""
-    try:
-        if val is None:
-            return None, "blank"
-        stripped = str(val).strip()
-        if stripped == "":
-            return None, "blank"
-        num = float(stripped)
-        if not math.isfinite(num):
-            return None, "non-finite"
-        return num, None
-    except (ValueError, TypeError, OverflowError):
-        return None, "not-a-number"
+with st.container(border=True):
+    left_col, right_col = st.columns(2)
+    with left_col:
+        age_val = st.number_input(
+            "Age (years)",
+            min_value=TRAINING_RANGES["age"]["min"],
+            max_value=TRAINING_RANGES["age"]["max"],
+            step=1,
+            key="age",
+            help=age_info,
+        )
+        st.caption(f"Accepted range: {TRAINING_RANGES['age']['min']} to {TRAINING_RANGES['age']['max']}")
+        cci_val = st.number_input(
+            "Charlson Comorbidity Index (CCI)",
+            min_value=TRAINING_RANGES["cci"]["min"],
+            max_value=TRAINING_RANGES["cci"]["max"],
+            step=1,
+            key="cci",
+            help=cci_info,
+        )
+        st.caption(f"Accepted range: {TRAINING_RANGES['cci']['min']} to {TRAINING_RANGES['cci']['max']}")
+    with right_col:
+        pbs_val = st.number_input(
+            "PBS Score",
+            min_value=TRAINING_RANGES["pbs"]["min"],
+            max_value=TRAINING_RANGES["pbs"]["max"],
+            step=1,
+            key="pbs",
+            help=pbs_info,
+        )
+        st.caption(f"Accepted range: {TRAINING_RANGES['pbs']['min']} to {TRAINING_RANGES['pbs']['max']}")
+        sofa_val = st.number_input(
+            "SOFA Score",
+            min_value=TRAINING_RANGES["sofa"]["min"],
+            max_value=TRAINING_RANGES["sofa"]["max"],
+            step=1,
+            key="sofa",
+            help=sofa_info,
+        )
+        st.caption(f"Accepted range: {TRAINING_RANGES['sofa']['min']} to {TRAINING_RANGES['sofa']['max']}")
 
-
-# Store parsed values in a dictionary for easier fallback handling
-parsed_vals = {
-    "age": None,
-    "cci": None,
-    "pbs": None,
-    "sofa": None,
-}
-parse_reasons = {}
-
-for field_key, raw_val in [("age", age), ("cci", cci), ("pbs", pbs), ("sofa", sofa)]:
-    parsed, reason = parse_num(raw_val)
-    parsed_vals[field_key] = parsed
-    parse_reasons[field_key] = reason
-
-fallback_used = []
-fallback_invalid = []
-fallback_blanks = []
-reason_labels = {
-    "blank": "left blank",
-    "not-a-number": "not a number",
-    "non-finite": "not a finite number",
-}
-for field in ["age", "cci", "pbs", "sofa"]:
-    if parsed_vals[field] is None:
-        parsed_vals[field] = fallback_defaults[field]
-        reason = parse_reasons.get(field)
-        reason_label = reason_labels.get(reason, "invalid input")
-        entry = f"{field.upper()}: {parsed_vals[field]} ({reason_label})"
-        fallback_used.append(entry)
-        if reason != "blank":
-            fallback_invalid.append(entry)
-        else:
-            fallback_blanks.append(entry)
-
-# Unpack back to individual variables for downstream code
-age_val = parsed_vals["age"]
-cci_val = parsed_vals["cci"]
-pbs_val = parsed_vals["pbs"]
-sofa_val = parsed_vals["sofa"]
-violations = []
-if age_val < TRAINING_RANGES["age"]["min"] or age_val > TRAINING_RANGES["age"]["max"]:
-    violations.append(f"Age={age_val} (trained range: {TRAINING_RANGES['age']['min']}-{TRAINING_RANGES['age']['max']})")
-if cci_val < TRAINING_RANGES["cci"]["min"] or cci_val > TRAINING_RANGES["cci"]["max"]:
-    violations.append(f"CCI={cci_val} (trained range: {TRAINING_RANGES['cci']['min']}-{TRAINING_RANGES['cci']['max']})")
-if pbs_val < TRAINING_RANGES["pbs"]["min"] or pbs_val > TRAINING_RANGES["pbs"]["max"]:
-    violations.append(f"PBS={pbs_val} (trained range: {TRAINING_RANGES['pbs']['min']}-{TRAINING_RANGES['pbs']['max']})")
-if sofa_val < TRAINING_RANGES["sofa"]["min"] or sofa_val > TRAINING_RANGES["sofa"]["max"]:
-    violations.append(f"SOFA={sofa_val} (trained range: {TRAINING_RANGES['sofa']['min']}-{TRAINING_RANGES['sofa']['max']})")
-
-if violations:
-    st.warning(
-        "⚠️ One or more inputs are outside the range observed in the model's training data:\n\n"
-        + "\n".join([f"- {v}" for v in violations])
-        + "\n\nPredictions in this region may be less reliable."
-    )
-if fallback_invalid:
-    st.warning(
-        "⚠️ Some entries were invalid and replaced with defaults:\n\n"
-        + "\n".join([f"- {entry}" for entry in fallback_invalid])
-    )
-if fallback_blanks:
-    st.caption(f"Using default values for empty fields: {', '.join(fallback_blanks)}. You can enter values to override these defaults.")
-
-# Predict and Reset buttons side-by-side
-col1, col2 = st.columns([1, 1])
-with col1:
-    predict = st.button("Estimate Probability")
-with col2:
-    reset = st.button("Reset", on_click=reset_form)
+predict = st.button("Estimate Probability", use_container_width=True)
+if predict:
+    st.session_state.prediction_inputs = {
+        "age": age_val,
+        "cci": cci_val,
+        "pbs": pbs_val,
+        "sofa": sofa_val,
+    }
 
 # ------------------------
 # Prediction & Results
 # ------------------------
-if predict:
+if st.session_state.prediction_inputs is not None:
+    prediction_inputs = st.session_state.prediction_inputs
+    age_val = prediction_inputs["age"]
+    cci_val = prediction_inputs["cci"]
+    pbs_val = prediction_inputs["pbs"]
+    sofa_val = prediction_inputs["sofa"]
+
     # Anchor to scroll results into view after clicking the button
     st.markdown("<div id='result-section' style='height:1px;'></div>", unsafe_allow_html=True)
 
